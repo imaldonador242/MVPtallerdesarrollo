@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% block title %}Mapa del Campus{% endblock %}
+
+{% block extra_head %}
+<style>
+  #contenedor-mapa { position: relative; overflow: hidden; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; }
+  #objeto-svg, #svg-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .nodo-marcador   { cursor: pointer; }
+  .ruta-linea      { stroke: #0d6efd; stroke-width: 4; fill: none; stroke-dasharray: 8 4; animation: marchar 0.6s linear infinite; }
+  @keyframes marchar { to { stroke-dashoffset: -24; } }
+  #panel-ruta      { max-height: 320px; overflow-y: auto; }
+  #btn-volver-general { position: absolute; top: 10px; left: 10px; z-index: 5; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="row g-3">
+
+    <!-- ===== PANEL IZQUIERDO ===== -->
+    <div class="col-lg-3 col-md-4">
+
+      <!-- Buscador HU2 -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-bold mb-2">
+            <i class="bi bi-search" aria-hidden="true"></i> Buscar destino
+          </h2>
+          <label for="input-busqueda" class="visually-hidden">Buscar sala o edificio</label>
+          <input type="search" id="input-busqueda" class="form-control form-control-sm mb-2"
+                 placeholder="Ej: Sala M1-301, Biblioteca…" autocomplete="off"
+                 aria-autocomplete="list" aria-controls="lista-sugerencias">
+          <ul id="lista-sugerencias" class="list-group list-group-flush small" role="listbox"></ul>
+        </div>
+      </div>
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-bold mb-2">
+            <i class="bi bi-signpost-split" aria-hidden="true"></i> Calcular ruta
+          </h2>
+
+          <label for="sel-origen" class="form-label small">Desde</label>
+          <select id="sel-origen" class="form-select form-select-sm mb-2" aria-label="Punto de origen">
+            <option value="">-- Selecciona origen --</option>
+            {% for n in nodos %}
+            <option value="{{ n.id }}" data-svg="{{ n.svg_id }}">{{ n.nombre }}</option>
+            {% endfor %}
+          </select>
+
+          <label for="sel-destino" class="form-label small">Hasta</label>
+          <select id="sel-destino" class="form-select form-select-sm mb-2" aria-label="Punto de destino">
+            <option value="">-- Selecciona destino --</option>
+            {% for n in nodos %}
+            <option value="{{ n.id }}" data-svg="{{ n.svg_id }}">{{ n.nombre }}</option>
+            {% endfor %}
+          </select>
+
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="chk-accesible" checked>
+            <label class="form-check-label small" for="chk-accesible">
+              Solo ruta accesible (sin escaleras)
+            </label>
+          </div>
+
+          <button id="btn-calcular-ruta" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-arrow-right-circle" aria-hidden="true"></i> Calcular ruta
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros HU6 HU7 -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-bold mb-2">
+            <i class="bi bi-funnel" aria-hidden="true"></i> Mostrar en mapa
+          </h2>
+          <div class="d-flex flex-wrap gap-1">
+            <button class="btn btn-outline-info btn-sm filtro-btn" data-tipo="bano_accesible">
+              <i class="bi bi-gender-neuter" aria-hidden="true"></i> Baños
+            </button>
+            <button class="btn btn-outline-warning btn-sm filtro-btn" data-tipo="ascensor">
+              <i class="bi bi-arrow-up-square" aria-hidden="true"></i> Ascensores
+            </button>
+            <button class="btn btn-outline-success btn-sm filtro-btn" data-tipo="zona_tranquila">
+              <i class="bi bi-tree" aria-hidden="true"></i> Zonas tranquilas
+            </button>
+            <button class="btn btn-outline-danger btn-sm filtro-btn" data-tipo="rampa">
+              <i class="bi bi-chevron-bar-up" aria-hidden="true"></i> Rampas
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="btn-limpiar-filtros">
+              <i class="bi bi-x-circle" aria-hidden="true"></i> Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navegacion por pisos -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-body">
+          <h2 class="h6 fw-bold mb-2">
+            <i class="bi bi-building" aria-hidden="true"></i> Ver interior
+          </h2>
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            <span class="small text-muted w-100 fw-semibold">Edificio M1</span>
+            <button class="btn btn-outline-primary btn-sm" onclick="CampusMapa.cambiarPiso('M1',1)">Piso 1</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="CampusMapa.cambiarPiso('M1',2)">Piso 2</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="CampusMapa.cambiarPiso('M1',3)">Piso 3</button>
+            <button class="btn btn-outline-primary btn-sm" onclick="CampusMapa.cambiarPiso('M1',4)">Piso 4</button>
+          </div>
+          <div class="d-flex flex-wrap gap-1 mb-2">
+            <span class="small text-muted w-100 fw-semibold">Edificio M3</span>
+            <button class="btn btn-outline-success btn-sm" onclick="CampusMapa.cambiarPiso('M3',1)">Piso 1</button>
+            <button class="btn btn-outline-success btn-sm" onclick="CampusMapa.cambiarPiso('M3',2)">Piso 2</button>
+            <button class="btn btn-outline-success btn-sm" onclick="CampusMapa.cambiarPiso('M3',3)">Piso 3</button>
+            <button class="btn btn-outline-success btn-sm" onclick="CampusMapa.cambiarPiso('M3',4)">Piso 4</button>
+          </div>
+          <button class="btn btn-light btn-sm w-100" onclick="CampusMapa.volverMapaGeneral()">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Mapa general
+          </button>
+        </div>
+      </div>
+
+      <!-- Resultado de ruta + TTS HU3 -->
+      <div class="card shadow-sm" id="card-resultado" style="display:none">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 fw-bold mb-0">
+              <i class="bi bi-list-ol" aria-hidden="true"></i> Instrucciones
+            </h2>
+            <button id="btn-leer-ruta" class="btn btn-success btn-sm" title="Escuchar instrucciones">
+              <i class="bi bi-volume-up" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div id="panel-ruta" aria-live="polite"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="col-lg-9 col-md-8">
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h1 class="h5 mb-0" id="titulo-mapa">Mapa del Campus UTEM Macul</h1>
+        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modal-reporte">
+          <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Reportar barrera
+        </button>
+      </div>
+
+      <div id="contenedor-mapa" style="height: 70vh;">
+        <button id="btn-volver-general" class="btn btn-light btn-sm shadow-sm" type="button"
+                onclick="CampusMapa.volverMapaGeneral()">
+          <i class="bi bi-arrow-left" aria-hidden="true"></i> Volver al mapa general
+        </button>
+
+        <object id="objeto-svg" type="image/svg+xml"
+                data="{{ url_for('static', filename='img/Mapeo General.svg') }}"
+                aria-label="Mapa interactivo del campus UTEM Macul">
+          Tu navegador no soporta SVG.
+        </object>
+        <svg id="svg-overlay" preserveAspectRatio="xMidYMid meet"
+             style="pointer-events:none;" aria-hidden="true"></svg>
+      </div>
+
+      <div class="mt-2 d-flex flex-wrap gap-3 small text-muted">
+        <span><span class="badge" style="background:#0d6efd">●</span> Ruta calculada</span>
+        <span><span class="badge bg-danger">●</span> Barrera reportada</span>
+        <span><span class="badge bg-success">●</span> Accesible</span>
+        <span><span class="badge bg-warning text-dark">●</span> Fuera de servicio</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="modal-piso" tabindex="-1" aria-labelledby="titulo-modal-piso" aria-modal="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h6" id="titulo-modal-piso">Seleccionar piso</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" id="texto-modal-piso">Elige el piso del edificio.</p>
+        <div id="grid-pisos" class="d-grid gap-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-reporte" tabindex="-1" aria-labelledby="titulo-modal-reporte" aria-modal="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="titulo-modal-reporte">
+          <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Reportar barrera
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="rep-nodo" class="form-label">Ubicación afectada <span aria-hidden="true">*</span></label>
+          <select id="rep-nodo" class="form-select" required aria-required="true">
+            <option value="">-- Selecciona el lugar --</option>
+            {% for n in nodos %}
+            <option value="{{ n.id }}">{{ n.nombre }}</option>
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback">Selecciona una ubicación.</div>
+        </div>
+        <div class="mb-3">
+          <label for="rep-tipo" class="form-label">Tipo de problema <span aria-hidden="true">*</span></label>
+          <select id="rep-tipo" class="form-select" required aria-required="true">
+            <option value="">-- Selecciona --</option>
+            <option value="rampa_bloqueada">Rampa bloqueada</option>
+            <option value="ascensor_fuera">Ascensor fuera de servicio</option>
+            <option value="camino_cortado">Camino cortado</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label for="rep-descripcion" class="form-label">Descripción (opcional)</label>
+          <textarea id="rep-descripcion" class="form-control" rows="3"
+                    placeholder="Cuéntanos más sobre el problema…" maxlength="500"></textarea>
+        </div>
+        <div id="rep-mensaje" class="alert d-none" role="alert" aria-live="polite"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" id="btn-enviar-reporte">
+          <i class="bi bi-send" aria-hidden="true"></i> Enviar reporte
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-nodo" tabindex="-1" aria-labelledby="titulo-modal-nodo" aria-modal="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h6" id="titulo-modal-nodo">Información</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" id="cuerpo-modal-nodo"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btn-guardar-favorito">
+          <i class="bi bi-bookmark-plus" aria-hidden="true"></i> Guardar en favoritos
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  window.CAMPUS_PISOS = {
+    'M1': { nombre: 'Edificio M1', pisos: [1, 2, 3, 4] },
+    'M3': { nombre: 'Edificio M3', pisos: [1, 2, 3, 4] }
+  };
+  window.CAMPUS_SVG_BASE    = "{{ url_for('static', filename='img/') }}";
+  window.CAMPUS_SVG_GENERAL = "{{ url_for('static', filename='img/Mapeo General.svg') }}";
+</script>
+<script src="{{ url_for('static', filename='js/mapa.js') }}"></script>
+<script src="{{ url_for('static', filename='js/floor-selector.js') }}"></script>
+{% endblock %}

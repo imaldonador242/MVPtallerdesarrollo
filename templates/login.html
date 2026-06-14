@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}Iniciar sesión{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-sm-8 col-md-6 col-lg-5">
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+
+          <h1 class="h4 fw-bold mb-4 text-center">
+            <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Iniciar sesión
+          </h1>
+
+          <div class="mb-3">
+            <label for="email" class="form-label">Correo electrónico <span aria-hidden="true">*</span></label>
+            <input type="email" id="email" name="email" class="form-control"
+                   placeholder="correo@utem.cl" required aria-required="true"
+                   autocomplete="email">
+            <div class="invalid-feedback">Ingresa un correo válido.</div>
+          </div>
+
+          <div class="mb-4">
+            <label for="password" class="form-label">Contraseña <span aria-hidden="true">*</span></label>
+            <div class="input-group">
+              <input type="password" id="password" name="password" class="form-control"
+                     placeholder="Tu contraseña" required aria-required="true"
+                     autocomplete="current-password">
+              <button class="btn btn-outline-secondary" type="button" id="btn-ver-pass"
+                      aria-label="Mostrar u ocultar contraseña">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="invalid-feedback">Ingresa tu contraseña.</div>
+          </div>
+
+          <button type="button" id="btn-login" class="btn btn-primary w-100 mb-3">
+            Ingresar
+          </button>
+
+          <p class="text-center small text-muted mb-0">
+            ¿No tienes cuenta?
+            <a href="{{ url_for('registro') }}">Regístrate aquí</a>
+          </p>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Mostrar/ocultar contraseña
+  document.getElementById('btn-ver-pass').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    const icono = this.querySelector('i');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icono.classList.replace('bi-eye', 'bi-eye-slash');
+      this.setAttribute('aria-label', 'Ocultar contraseña');
+    } else {
+      input.type = 'password';
+      icono.classList.replace('bi-eye-slash', 'bi-eye');
+      this.setAttribute('aria-label', 'Mostrar contraseña');
+    }
+  });
+
+  // Validación antes de enviar
+  document.getElementById('btn-login').addEventListener('click', function () {
+    const email    = document.getElementById('email');
+    const password = document.getElementById('password');
+    let valido = true;
+
+    if (!email.value.trim() || !email.validity.valid) {
+      email.classList.add('is-invalid');
+      valido = false;
+    } else {
+      email.classList.remove('is-invalid');
+    }
+
+    if (!password.value.trim()) {
+      password.classList.add('is-invalid');
+      valido = false;
+    } else {
+      password.classList.remove('is-invalid');
+    }
+
+    if (valido) {
+      // Crear formulario y enviarlo
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{{ url_for("login") }}';
+
+      [['email', email.value], ['password', password.value]].forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type  = 'hidden';
+        input.name  = name;
+        input.value = value;
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+    }
+  });
+</script>
+{% endblock %}

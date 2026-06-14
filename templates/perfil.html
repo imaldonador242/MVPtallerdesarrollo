@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% block title %}Mi perfil{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <h1 class="h4 fw-bold mb-4">
+    <i class="bi bi-person-circle" aria-hidden="true"></i>
+    Mi perfil — {{ session.get('nombre') }}
+  </h1>
+
+  <div class="row g-4">
+
+    <!-- ===== FAVORITOS HU8 ===== -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header fw-bold">
+          <i class="bi bi-bookmark-heart" aria-hidden="true"></i> Mis destinos frecuentes
+        </div>
+        <div class="card-body">
+
+          {% if favoritos %}
+          <ul class="list-group list-group-flush" id="lista-favoritos" aria-label="Destinos guardados">
+            {% for fav in favoritos %}
+            <li class="list-group-item d-flex justify-content-between align-items-center"
+                id="fav-{{ fav.id }}">
+              <div>
+                <span class="fw-bold">{{ fav.alias or fav.nombre }}</span>
+                {% if fav.alias %}
+                <span class="text-muted small ms-1">({{ fav.nombre }})</span>
+                {% endif %}
+                <br>
+                <span class="badge bg-secondary small">{{ fav.tipo | replace('_', ' ') }}</span>
+              </div>
+              <div class="d-flex gap-2">
+                <!-- Ir directamente al mapa con ese destino -->
+                <a href="{{ url_for('mapa') }}?destino={{ fav.nodo_id }}"
+                   class="btn btn-sm btn-outline-primary"
+                   aria-label="Navegar a {{ fav.nombre }}">
+                  <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                </a>
+                <!-- Eliminar favorito -->
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="eliminarFavorito({{ fav.id }})"
+                        aria-label="Eliminar {{ fav.nombre }} de favoritos">
+                  <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="text-center text-muted py-4" id="sin-favoritos">
+            <i class="bi bi-bookmark fs-2 d-block mb-2" aria-hidden="true"></i>
+            No tienes destinos guardados todavía.<br>
+            <a href="{{ url_for('mapa') }}" class="btn btn-outline-primary btn-sm mt-2">
+              Ir al mapa
+            </a>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== INFO DE CUENTA ===== -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header fw-bold">
+          <i class="bi bi-info-circle" aria-hidden="true"></i> Información de cuenta
+        </div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-4">Nombre</dt>
+            <dd class="col-sm-8">{{ session.get('nombre') }}</dd>
+
+            <dt class="col-sm-4">Rol</dt>
+            <dd class="col-sm-8">
+              <span class="badge bg-primary">{{ session.get('rol', 'estudiante') }}</span>
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Accesos rápidos -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-header fw-bold">
+          <i class="bi bi-lightning" aria-hidden="true"></i> Accesos rápidos
+        </div>
+        <div class="card-body d-flex flex-wrap gap-2">
+          <a href="{{ url_for('mapa') }}?tipo=bano_accesible" class="btn btn-outline-info btn-sm">
+            <i class="bi bi-gender-neuter" aria-hidden="true"></i> Baños accesibles
+          </a>
+          <a href="{{ url_for('mapa') }}?tipo=zona_tranquila" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-tree" aria-hidden="true"></i> Zonas tranquilas
+          </a>
+          <a href="{{ url_for('mapa') }}?tipo=ascensor" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-arrow-up-square" aria-hidden="true"></i> Ascensores
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="perfil-mensaje" class="alert mt-3 d-none" role="alert" aria-live="polite"></div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function eliminarFavorito(favId) {
+    if (!confirm('¿Eliminar este destino de tus favoritos?')) return;
+
+    fetch(`/api/favoritos/${favId}`, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(data => {
+      const el = document.getElementById(`fav-${favId}`);
+      if (el) el.remove();
+
+      // Si no quedan favoritos, mostrar mensaje vacío
+      const lista = document.getElementById('lista-favoritos');
+      if (lista && lista.children.length === 0) {
+        lista.outerHTML = `
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-bookmark fs-2 d-block mb-2"></i>
+            No tienes destinos guardados todavía.<br>
+            <a href="/mapa" class="btn btn-outline-primary btn-sm mt-2">Ir al mapa</a>
+          </div>`;
+      }
+
+      const msg = document.getElementById('perfil-mensaje');
+      msg.className = 'alert alert-success mt-3';
+      msg.textContent = data.mensaje;
+      setTimeout(() => msg.classList.add('d-none'), 3000);
+    });
+  }
+</script>
+{% endblock %}
